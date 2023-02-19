@@ -3,6 +3,7 @@
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .logo {
@@ -40,3 +41,63 @@
 .read-the-docs {
   color: #888;
 }
+.BlogCreation{
+  display: flex;
+  flex-direction: column;
+  /* background-color: aqua; */
+  height: 100%;
+  width: 100vh;
+  
+}
+
+.BlogTitle
+{
+  min-height: 5%;
+  margin: 1rem;
+  font-size: 1em;
+  font-weight: 200;
+  font-family: inherit;
+}
+
+.BlogDescription
+{
+  min-height: 15%;
+  margin-left: 1rem;
+  margin: 2em;
+}
+
+.BlogStory
+{
+  min-height: 50%;
+  margin: 1rem;
+  font-size: 2em;
+}
+
+textarea{
+  resize: none;
+ 
+  font-weight: 200;
+  font-family: inherit;
+}
+
+#Submit{
+    height: fit-content;
+    width: fit-content;
+    margin-bottom: 16px;
+    margin-left: 1rem;
+}
+.Header{
+  display: flex;
+  width: 100vh;
+  justify-content: space-around;
+}
+
+.Heading{
+  text-align: left;
+  margin-top: 48px;
+  margin-left: 1rem;
+  font-size: 3em;
+  font-weight: 100;
+  font-family: inherit;
+}
+

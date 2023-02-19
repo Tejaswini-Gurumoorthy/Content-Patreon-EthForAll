@@ -2,8 +2,6 @@
 pragma solidity ^0.8.17;
 
 contract Blog{
-    mapping(uint=>address) public cidBlog; //it maps a cid to an owner;
-    event BlogPost(address, uint);
     address public owner;
     uint public level1;
     uint public level2;
@@ -15,12 +13,18 @@ contract Blog{
         bool follows;
     }
 
+    struct Cid{
+        uint timestamp;
+        uint amtEarned;
+    }
+
     struct Creator{
         string name;
-        mapping(uint=>uint) cidAmt; //mapping which stores the amount earned by each blog
         uint total; //total amount earned
         mapping(address=>ValueLevel) consumerAmt; //mapping to store the follower consumer's total contribution to the creator
-        mapping(uint=>uint) cidToTimestamp; //mapping containing cid of all blogs by creator to the timestamp
+        mapping(string=> Cid) blogInfo; //mapping to store blog's cid mapped to timestamp and amount earned.
+        string[] cids;
+        address[] allConsumers;
         bool exists;
 
     }
@@ -28,11 +32,19 @@ contract Blog{
     struct Consumer{
         string name;
         mapping(address=>ValueLevel) creatorAmt; //mapping which stores the communities consumer is a part of and their contributions.
+        address[] allCreators;
         bool exists;
     }
     
-    mapping(address=>Creator) creators;
-    mapping(address=>Consumer) consumers;
+    mapping(address=>Creator) private creators;
+    mapping(address=>Consumer) private consumers;
+    mapping(string=>address) public cidBlog; //it maps a cid to an owner;
+    event BlogPost(address, string);
+    event SilverNFT(address, address); //creator consumer
+    event GoldNFT(address, address);
+    event PlatinumNFT(address, address);
+    event CreatorJoined(address); 
+    event testingFollows(address, bool);
 
     constructor(uint _level1, uint _level2, uint _level3)
     {
@@ -45,47 +57,53 @@ contract Blog{
     //creator
     function joinCreator(string memory _name) public{
         require(consumers[msg.sender].exists==false, "Consumer cannot be Creator");
+        require(creators[msg.sender].exists==false, "Creator already exists");
+
         Creator storage newCreator= creators[msg.sender];
         newCreator.name= _name;
         newCreator.total=0;
         newCreator.exists= true;
+        emit CreatorJoined(msg.sender);
 
     }
 
     //consumer
-    function joinConsumer(string memory _name) public {
+    function joinConsumer(string memory _name) public 
+    {
         require(creators[msg.sender].exists==false, "Creator cannot be consumer");
+        require(consumers[msg.sender].exists==false, "Consumer already exists");
         Consumer storage newConsumer= consumers[msg.sender];
         newConsumer.name= _name;
         newConsumer.exists= true;
     }
 
     // creator
-    function postBlog(uint _cid) public
+    function postBlog(string memory _cid) public
     {
         require(creators[msg.sender].exists==true, "User not registered");
-        creators[msg.sender].cidAmt[_cid]=0;
-        creators[msg.sender].cidToTimestamp[_cid]= block.timestamp;
+        creators[msg.sender].cids.push(_cid);
+        creators[msg.sender].blogInfo[_cid].timestamp= block.timestamp;
+        creators[msg.sender].blogInfo[_cid].amtEarned = 0;
         emit BlogPost(msg.sender, _cid);
     }
 
     //consumer
-    function FollowCreator(address _creatorAddress) public{
+    function followCreator(address _creatorAddress) public{
         require(consumers[msg.sender].exists==true, "User not registered");
         require(consumers[msg.sender].creatorAmt[_creatorAddress].follows== false, "User already follows");
-        consumers[msg.sender].creatorAmt[_creatorAddress].value= 0;
-        consumers[msg.sender].creatorAmt[_creatorAddress].level= 0;
+        require(creators[_creatorAddress].consumerAmt[msg.sender].follows== false, "User already follows");
         consumers[msg.sender].creatorAmt[_creatorAddress].follows= true;
-        creators[_creatorAddress].consumerAmt[msg.sender].value=0;
-        creators[_creatorAddress].consumerAmt[msg.sender].level=0;
-        creators[_creatorAddress].consumerAmt[msg.sender].follows=true;
+        creators[_creatorAddress].consumerAmt[msg.sender].follows= true;
+        consumers[msg.sender].allCreators.push(_creatorAddress);
+        creators[_creatorAddress].allConsumers.push(msg.sender);
     }
 
     //consumer
-    function LikeBlog(uint _cid) public payable
+    function likeBlog(string memory _cid) public payable
     {
         address _creatorAddress= cidBlog[_cid];
         require(consumers[msg.sender].creatorAmt[_creatorAddress].follows== true, "Follow the creator first");
+        require(creators[_creatorAddress].consumerAmt[msg.sender].follows==true, "Follow the creator first");
         (bool s,)= cidBlog[_cid].call{ value: msg.value }("");
         require(s);
         creators[_creatorAddress].consumerAmt[msg.sender].value+= msg.value;
@@ -94,7 +112,7 @@ contract Blog{
     }
 
     //consumer
-    function JoinCommunity(address _creatorAddress, uint level) public
+    function joinCommunity(address _creatorAddress, uint level) public
     {
         require(consumers[msg.sender].creatorAmt[_creatorAddress].follows== true, "Follow the creator first");
         if(level==1)
@@ -102,6 +120,7 @@ contract Blog{
         require(consumers[msg.sender].creatorAmt[_creatorAddress].value >= level1, "Not eligible");
         consumers[msg.sender].creatorAmt[_creatorAddress].level= 1;
         creators[_creatorAddress].consumerAmt[msg.sender].level=1;
+        emit SilverNFT(_creatorAddress,msg.sender);
         }
         else if(level==2)
         {
@@ -109,6 +128,7 @@ contract Blog{
             require(consumers[msg.sender].creatorAmt[_creatorAddress].value >= level2, "Not eligible");
             consumers[msg.sender].creatorAmt[_creatorAddress].level= 2;
             creators[_creatorAddress].consumerAmt[msg.sender].level=2;
+            emit GoldNFT(_creatorAddress,msg.sender);
         }
         else if(level==3)
         {
@@ -116,10 +136,67 @@ contract Blog{
             require(consumers[msg.sender].creatorAmt[_creatorAddress].value >= level3, "Not eligible");
             consumers[msg.sender].creatorAmt[_creatorAddress].level= 3;
             creators[_creatorAddress].consumerAmt[msg.sender].level=3;
-        }
+            emit PlatinumNFT(_creatorAddress,msg.sender);
+       }
+       }
 
-
+    //creator getters
+    function creatorInfo() public view returns (string memory name, uint total, bool exists)
+    {
+        require(creators[msg.sender].exists==true || msg.sender== owner, "Creator doesn't exist");
+        name= creators[msg.sender].name;
+        total= creators[msg.sender].total;
+        exists= creators[msg.sender].exists;
     }
-    
+    function totalNoOfBlogs() public view returns(uint)
+    {
+        require(creators[msg.sender].exists==true || msg.sender==owner, "Creator doesn't exist");
+        return creators[msg.sender].cids.length;
+    }
 
+    function getAllBlogs(uint _idx) public view returns(string memory _cid, uint timestamp, uint amtEarned){
+        require(creators[msg.sender].exists==true || msg.sender== owner, "Not accessible");
+        _cid= creators[msg.sender].cids[_idx];
+        timestamp= creators[msg.sender].blogInfo[_cid].timestamp;
+        amtEarned= creators[msg.sender].blogInfo[_cid].amtEarned;
+    }
+
+   
+    function totalConsumerFollowing() public view returns(uint)
+    {
+        require(creators[msg.sender].exists==true || msg.sender== owner, "Not accessible");
+        return creators[msg.sender].allConsumers.length;
+    }
+
+    function getConsumerFollowingDetails(uint _idx) public view returns(uint value, uint level, bool follows, address consumer){
+        require(creators[msg.sender].exists==true  || msg.sender== owner, "Not accessible");
+        consumer= creators[msg.sender].allConsumers[_idx];
+        value= creators[msg.sender].consumerAmt[consumer].value;
+        level= creators[msg.sender].consumerAmt[consumer].level;
+        follows= creators[msg.sender].consumerAmt[consumer].follows;
+    }
+
+     //consumer getters
+    function consumerInfo() public view returns(string memory name, bool exists)
+    {
+        require(consumers[msg.sender].exists==true  || msg.sender== owner, "Not accessible");
+        name = consumers[msg.sender].name;
+        exists= consumers[msg.sender].exists;
+    }
+
+    function totalCreatorFollowing() public view returns(uint)
+    {
+        require(consumers[msg.sender].exists==true || msg.sender== owner, "Not accessible");
+        return consumers[msg.sender].allCreators.length;
+    }
+
+    //called by consumer
+    function getCreatorFollowingDetails(uint _idx) public view returns(uint value, uint level, bool follows, address creator) 
+    {
+        require(consumers[msg.sender].exists==true  || msg.sender== owner, "Not accessible");
+        creator= consumers[msg.sender].allCreators[_idx];
+        value= consumers[msg.sender].creatorAmt[creator].value;
+        level= consumers[msg.sender].creatorAmt[creator].level;
+        follows= consumers[msg.sender].creatorAmt[creator].follows;
+    }
 }

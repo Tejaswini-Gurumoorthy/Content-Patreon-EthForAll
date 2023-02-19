@@ -6,7 +6,6 @@
 // global scope, and execute the script.
 const hre = require("hardhat");
 
-
 async function main() {
   const Blog = await hre.ethers.getContractFactory("Blog");
   const blog = await Blog.deploy(2,4,8);

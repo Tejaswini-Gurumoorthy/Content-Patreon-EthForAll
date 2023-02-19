@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {ethers} from 'ethers'
 import { useNavigate } from 'react-router-dom';
 
@@ -6,16 +6,29 @@ function WalletConnect() {
     const {ethereum}= window;
     const navigate= useNavigate();
     const [currentAcc, setCurrentAcc]= useState();
+
+    useEffect(()=>{
+      setCurrentAcc(undefined);
+    },[]);
+
+    useEffect(()=>{
+       if(currentAcc!=undefined)
+       {
+        const link= '/Blogs';
+        navigate(link);
+       }
+    }, [currentAcc]);
+  
     const showConnect= async()=>{
       if(!ethereum) return alert("Please install metamask!");
-      const accounts= await ethereum.request({method: 'eth_requestAccounts'});
-      setCurrentAcc(accounts[0]);
-      console.log('accounts: '+accounts[0]);
-      setCurrentAcc(accounts[0]);
-      await console.log('Current: '+currentAcc);
-      const link= '/Users/'+ accounts[0];
-      console.log('link: '+link);
-      navigate(link);
+      await ethereum.request({
+        method: 'eth_requestAccounts'
+      }).then(async(accounts)=>{
+        setCurrentAcc(accounts[0]);
+       
+      }).catch((err)=>{
+        alert('Connection failed!');
+      });      
     }
     
 
